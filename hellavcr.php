@@ -42,13 +42,34 @@ function process_tv() {
 			}
 			if(array_key_exists(strval($show->source), $GLOBALS['sources'])) {
 				$nameExtra[] = $GLOBALS['sources'][strval($show->source)];
-			}
+			}			
 			$nameExtra = implode(', ', $nameExtra);
 			if(strlen($nameExtra) > 0) $nameExtra = ' (' . $nameExtra . ')';
 			
 			//full show name
 			$name = htmlspecialchars_decode($show->name) . $nameExtra;
 			print date($config['logging']['date_format']) . $name . "\n";
+			
+			//terms
+			if(empty($show['hasterms'])) {
+				$show->addAttribute('hasterms', '');
+				$show['hasterms'] = '';
+			}
+			
+			if(empty($show['noterms'])) {
+				$show->addAttribute('noterms', '');
+				$show['noterms'] = '';
+			}
+			
+			if($config['nzb_site'] == 'nzbmatrix') {
+				$hasterms = $config['nzbmatrix_hasterms'];
+				if(!empty($show['hasterms'])) $hasterms = array_merge($hasterms, explode(',', $show['hasterms']));
+				if(!empty($hasterms)) print date($config['logging']['date_format']) . '	has terms: ' . implode(',', $hasterms) . "\n";
+				
+				$noterms = $config['nzbmatrix_noterms'];
+				if(!empty($show['noterms'])) $noterms = array_merge($noterms, explode(',', $show['noterms']));
+				if(!empty($noterms)) print date($config['logging']['date_format']) . '	skip terms: ' . implode(',', $noterms) . "\n";
+			}
 			
 			//add timestamp
 			if(empty($show['updated'])) {
@@ -244,7 +265,9 @@ function process_tv() {
 								'episode' => $current_episode,
 								'language' => $show->language,
 								'format' => $show->format,
-								'source' => $show->source
+								'source' => $show->source,
+								'hasterms' => isset($show['hasterms']) ? $show['hasterms'] : '',
+								'noterms' => isset($show['noterms']) ? $show['noterms'] : ''
 							));
 							
 							$nzb_downloaded = false;
@@ -627,7 +650,7 @@ function search_nzb($params) {
 				'format' => $params['format']
 			));
 			
-			//wait for next call if too son
+			//wait for next call if too soon
 			if(!empty($GLOBALS['nzbmatrix_timestamp'])) {
 				$elapsed = time() - $GLOBALS['nzbmatrix_timestamp'];
 				if($elapsed < $config['nzbmatrix']['wait_time']) {
@@ -667,6 +690,20 @@ function search_nzb($params) {
 				REGION:0; = Region Coding (See notes)
 				*/
 				
+				$hasterms = $config['nzbmatrix_hasterms'];
+				$params['hasterms'] = strval($params['hasterms']);
+				$hastermsLocal = strlen($params['hasterms']) <= 0 ? array() : explode(',', $params['hasterms']);
+				foreach($hastermsLocal as $term) {
+					$hasterms[] = $term;
+				}
+				
+				$noterms = $config['nzbmatrix_noterms'];
+				$params['noterms'] = strval($params['noterms']);
+				$notermsLocal = strlen($params['noterms']) <= 0 ? array() : explode(',', $params['noterms']);
+				foreach($notermsLocal as $term) {
+					$noterms[] = $term;
+				}
+				
 				foreach($results as $result) {
 					$lines = explode(';', $result);
 					$parts = array();
@@ -678,18 +715,18 @@ function search_nzb($params) {
 					
 					if(isset($parts['NZBNAME'])) {
 						//check name has these terms
-						if(!empty($config['nzbmatrix_hasterms'])) {
-							foreach($config['nzbmatrix_hasterms'] as $term) {
-								if(stripos($parts['NZBNAME'], $term) === false) {
+						if(!empty($hasterms)) {
+							foreach($hasterms as $term) {
+								if(stripos($parts['NZBNAME'], trim($term)) === false) {
 									$name_ok = false;
 								}
 							}
 						}
 					
 						//check it doesn't have these ones
-						if($name_ok && !empty($config['nbzmatrix_noterms'])) {
-							foreach($config['nbzmatrix_noterms'] as $term) {
-								if(stripos($parts['NZBNAME'], $term) !== false) {
+						if($name_ok && !empty($noterms)) {
+							foreach($noterms as $term) {
+								if(stripos($parts['NZBNAME'], trim($term)) !== false) {
 									$name_ok = false;
 								}
 							}
