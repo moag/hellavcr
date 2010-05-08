@@ -51,12 +51,12 @@ function process_tv() {
 			print date($config['logging']['date_format']) . $name . "\n";
 			
 			//terms
-			if(empty($show['hasterms'])) {
+			if(!$show['hasterms']) {
 				$show->addAttribute('hasterms', '');
 				$show['hasterms'] = '';
 			}
 			
-			if(empty($show['noterms'])) {
+			if(!$show['noterms']) {
 				$show->addAttribute('noterms', '');
 				$show['noterms'] = '';
 			}
