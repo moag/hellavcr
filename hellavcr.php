@@ -641,8 +641,40 @@ function search_nzb($params) {
 			//clean query
 			$showClean = str_replace($config['nzbmatrix']['strip_chars'], '', $params['show']);
 			
+			//convert to an array of terms
+			$terms = explode(' ', $showClean);
+			for($i = 0; $i < sizeof($terms); $i++) {
+				$terms[$i] = '+' . $terms[$i];
+			}
+			
+			//has terms
+			if(!empty($config['nzbmatrix_hasterms'])) {
+				foreach($config['nzbmatrix_hasterms'] as $term) {
+					if(!empty($term)) $terms[] = '+' . $term;
+				}
+			}
+			$hastermsLocal = strlen($params['hasterms']) <= 0 ? array() : explode(',', $params['hasterms']);
+			foreach($hastermsLocal as $term) {
+				if(!empty($term)) $terms[] = '+' . $term;
+			}
+			
+			//no terms
+			if(!empty($config['nzbmatrix_noterms'])) {
+				foreach($config['nzbmatrix_noterms'] as $term) {
+					if(!empty($term)) $terms[] = '-' . $term;
+				}
+			}
+			$notermsLocal = strlen($params['noterms']) <= 0 ? array() : explode(',', $params['noterms']);
+			foreach($notermsLocal as $term) {
+				if(!empty($term)) $terms[] = '-' . $term;
+			}
+			
+			//episode number
+			$terms[] = '+S' . sprintf('%02d', $params['season']) . 'E' . sprintf('%02d', $params['episode']);
+			// . '+' . sprintf('%d', $params['season']) . 'x' . sprintf('%02d', $params['episode']) . ')';
+			
 			//main query
-			$q = $showClean . ' ' . 'S' . sprintf('%02d', $params['season']) . 'E' . sprintf('%02d', $params['episode']) . '"or"' . $showClean . ' ' . sprintf('%d',$params['season']) . 'x' . sprintf('%02d', $params['episode']);
+			$q = implode(' ', $terms);
 			
 			//formatted query
 			$query = build_nzbmatrix_search_string(array(
@@ -672,72 +704,33 @@ function search_nzb($params) {
 					return search_nzb($params);
 				}
 				
-				$result = str_replace("\n", '', $result);
-				$results = explode('|', $result);
+				if(strpos($result, 'error:nothing_found') === false) {
+					$result = str_replace("\n", '', $result);
+					$results = explode('|', $result);
 				
-				/*
-				NZBID:444027; = NZB ID On Site
-				NZBNAME:mandriva linux 2009; = NZB Name On Site
-				LINK:nzbmatrix.com/nzb-details.php?id=444027&hit=1; = Link To NZB Details PAge
-				SIZE:1469988208.64; = Size in bytes
-				INDEX_DATE:2009-02-14 09:08:55; = Indexed By Site (Date/Time GMT)
-				USENET_DATE:2009-02-12 2:48:47; = Posted To Usenet (Date/Time GMT)
-				CATEGORY:TV > Divx/Xvid; = NZB Post Category
-				GROUP:alt.binaries.linux; = Usenet Newsgroup
-				COMMENTS:0; = Number Of Comments Posted
-				HITS:174; = Number Of Hits (Views)
-				NFO:yes; = NFO Present
-				REGION:0; = Region Coding (See notes)
-				*/
+					/*
+					NZBID:444027; = NZB ID On Site
+					NZBNAME:mandriva linux 2009; = NZB Name On Site
+					LINK:nzbmatrix.com/nzb-details.php?id=444027&hit=1; = Link To NZB Details PAge
+					SIZE:1469988208.64; = Size in bytes
+					INDEX_DATE:2009-02-14 09:08:55; = Indexed By Site (Date/Time GMT)
+					USENET_DATE:2009-02-12 2:48:47; = Posted To Usenet (Date/Time GMT)
+					CATEGORY:TV > Divx/Xvid; = NZB Post Category
+					GROUP:alt.binaries.linux; = Usenet Newsgroup
+					COMMENTS:0; = Number Of Comments Posted
+					HITS:174; = Number Of Hits (Views)
+					NFO:yes; = NFO Present
+					REGION:0; = Region Coding (See notes)
+					*/
 				
-				$hasterms = $config['nzbmatrix_hasterms'];
-				$params['hasterms'] = strval($params['hasterms']);
-				$hastermsLocal = strlen($params['hasterms']) <= 0 ? array() : explode(',', $params['hasterms']);
-				foreach($hastermsLocal as $term) {
-					$hasterms[] = $term;
-				}
-				
-				$noterms = $config['nzbmatrix_noterms'];
-				$params['noterms'] = strval($params['noterms']);
-				$notermsLocal = strlen($params['noterms']) <= 0 ? array() : explode(',', $params['noterms']);
-				foreach($notermsLocal as $term) {
-					$noterms[] = $term;
-				}
-				
-				foreach($results as $result) {
-					$lines = explode(';', $result);
-					$parts = array();
-					foreach($lines as $line) {
-						@list($key, $value) = @explode(':', $line);
-						$parts[$key] = $value;
-					}
-					$name_ok = true;
-					
-					if(isset($parts['NZBNAME'])) {
-						//check name has these terms
-						if(!empty($hasterms)) {
-							foreach($hasterms as $term) {
-								if(stripos($parts['NZBNAME'], trim($term)) === false) {
-									$name_ok = false;
-								}
-							}
+					foreach($results as $result) {
+						$lines = explode(';', $result);
+						$parts = array();
+						foreach($lines as $line) {
+							@list($key, $value) = @explode(':', $line);
+							$parts[$key] = $value;
 						}
-					
-						//check it doesn't have these ones
-						if($name_ok && !empty($noterms)) {
-							foreach($noterms as $term) {
-								if(stripos($parts['NZBNAME'], trim($term)) !== false) {
-									$name_ok = false;
-								}
-							}
-						}
-					}
-					else {
-						$name_ok = false;
-					}
-					
-					//found
-					if($name_ok) {
+
 						print 'found nzb ID ' . $parts['NZBID'] . $config['debug_separator'];
 						return array(
 							'id' => $parts['NZBID'],
