@@ -86,9 +86,17 @@ $GLOBALS['nzbmatrix_formats'] = array(
 	'1073741824' => '8'
 );
 
+$GLOBALS['nzbmatrix_formats_names'] = array(
+	'5' => 'DVD',
+	'6' => 'Divx/Xvid',
+	'41' => 'HD',
+	'7' => 'Sports/Ent',
+	'8' => 'other'
+);
+
 ##### system values
 
-$config['version'] = '0.8';
+$config['version'] = '0.9';
 $config['debug_separator'] = ' | ';
 $config['project_url'] = 'http://code.google.com/p/hellavcr/';
 $config['logging'] = array(
@@ -114,7 +122,7 @@ $config['nzbmatrix'] = array(
 	'protocol' => 'https://',
 	'base_url' => 'nzbmatrix.com/',
 	'strip_chars' => array(':', '&', '(', ')', "'", '"'),
-	'wait_time' => 10
+	'wait_time' => 30
 );
 $config['tvnzb'] = array(
 	'root_url' => 'http://tvnzb.com/',

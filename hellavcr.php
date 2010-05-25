@@ -222,7 +222,7 @@ function process_tv() {
 			if($show->latest) {
 				$latest = explode('x', $show->latest);
 				$latest_season = intval($latest[0]);
-				$latest_episode = intval($latest[1]);
+				$latest_episode = isset($latest[1]) ? intval($latest[1]) : 0;
 
 				//if season or episode are blank, default to the last episode so shows are downloded moving forward
 				if($show->season == '' && $show->episode == '') {
@@ -644,33 +644,36 @@ function search_nzb($params) {
 			//convert to an array of terms
 			$terms = explode(' ', $showClean);
 			for($i = 0; $i < sizeof($terms); $i++) {
-				$terms[$i] = '+' . $terms[$i];
+				//$terms[$i] = '+' . $terms[$i];
 			}
 			
 			//has terms
+			$hasterms = array();
 			if(!empty($config['nzbmatrix_hasterms'])) {
 				foreach($config['nzbmatrix_hasterms'] as $term) {
-					if(!empty($term)) $terms[] = '+' . $term;
+					if(!empty($term)) $hasterms[] = $term;
 				}
 			}
 			$hastermsLocal = strlen($params['hasterms']) <= 0 ? array() : explode(',', $params['hasterms']);
 			foreach($hastermsLocal as $term) {
-				if(!empty($term)) $terms[] = '+' . $term;
+				if(!empty($term)) $hasterms[] = $term;
 			}
 			
 			//no terms
+			$noterms = array();
 			if(!empty($config['nzbmatrix_noterms'])) {
 				foreach($config['nzbmatrix_noterms'] as $term) {
-					if(!empty($term)) $terms[] = '-' . $term;
+					if(!empty($term)) $noterms[] = $term;
 				}
 			}
 			$notermsLocal = strlen($params['noterms']) <= 0 ? array() : explode(',', $params['noterms']);
 			foreach($notermsLocal as $term) {
-				if(!empty($term)) $terms[] = '-' . $term;
+				if(!empty($term)) $noterms[] = $term;
 			}
 			
 			//episode number
-			$terms[] = '+S' . sprintf('%02d', $params['season']) . 'E' . sprintf('%02d', $params['episode']);
+			$terms[] = '(S' . sprintf('%02d', $params['season']) . 'E' . sprintf('%02d', $params['episode']) . '|' . sprintf('%d', $params['season']) . 'x' . sprintf('%02d', $params['episode']) . ')';
+			//$terms[] = 'S' . sprintf('%02d', $params['season']) . 'E' . sprintf('%02d', $params['episode']);
 			// . '+' . sprintf('%d', $params['season']) . 'x' . sprintf('%02d', $params['episode']) . ')';
 			
 			//main query
@@ -724,19 +727,51 @@ function search_nzb($params) {
 					*/
 				
 					foreach($results as $result) {
+						//skip empty results
+						$result = trim($result);
+						if(empty($result)) continue;
+						
+						//remove special chars
+						$result = str_replace('&amp;gt;', '', $result);
+						
+						//create parts
 						$lines = explode(';', $result);
 						$parts = array();
 						foreach($lines as $line) {
 							@list($key, $value) = @explode(':', $line);
 							$parts[$key] = $value;
 						}
+						
+						$name_ok = true;
+						
+						//re-check category
+						if(!empty($params['format'])) {
+							$catid = strval($GLOBALS['nzbmatrix_formats'][intval($params['format'])]);
+							$name_ok = stripos($parts['CATEGORY'], 'TV') !== false && stripos($parts['CATEGORY'], $GLOBALS['nzbmatrix_formats_names'][$catid]) !== false;
+						}
+						
+						//has terms
+						if($name_ok) {
+							foreach($hasterms as $term) {
+								$name_ok = $name_ok && stripos($parts['NZBNAME'], $term) !== false;
+							}
+						}
+						
+						//no terms
+						if($name_ok) {
+							foreach($noterms as $term) {
+								$name_ok = $name_ok && stripos($parts['NZBNAME'], $term) === false;
+							}
+						}
 
-						print 'found nzb ID ' . $parts['NZBID'] . $config['debug_separator'];
-						return array(
-							'id' => $parts['NZBID'],
-							'title' => $parts['NZBNAME'],
-							'url' => $config['nzbmatrix']['protocol'] . $parts['LINK']
-						);
+						if($name_ok) {
+							print 'found nzb ID ' . $parts['NZBID'] . $config['debug_separator'];
+							return array(
+								'id' => $parts['NZBID'],
+								'title' => $parts['NZBNAME'],
+								'url' => $config['nzbmatrix']['protocol'] . $parts['LINK']
+							);
+						}
 					}
 				}
 				
